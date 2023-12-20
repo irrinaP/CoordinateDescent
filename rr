@@ -1,151 +1,295 @@
 using System;
 using System.Windows.Forms;
+using MathNet.Symbolics;
+using OxyPlot;
+using OxyPlot.Series;
+using OxyPlot.WindowsForms;
+using OxyPlot.Axes;
+using System.Linq;
+using System.Text.RegularExpressions;
 
-namespace CoordinateDescentApp
+namespace CoordinateDescent
 {
-    public partial class MainForm : Form
+    static class Program
     {
-        private TextBox textBoxX1;
-        private TextBox textBoxX2;
-        private Button optimizeButton;
-        private TextBox resultTextBox;
-
-        public MainForm()
-        {
-            InitializeComponent();
-        }
-
-        private void InitializeComponent()
-        {
-            this.textBoxX1 = new TextBox();
-            this.textBoxX2 = new TextBox();
-            this.optimizeButton = new Button();
-            this.resultTextBox = new TextBox();
-            this.SuspendLayout();
-
-            // textBoxX1
-            this.textBoxX1.Location = new System.Drawing.Point(12, 12);
-            this.textBoxX1.Name = "textBoxX1";
-            this.textBoxX1.Size = new System.Drawing.Size(100, 20);
-            this.textBoxX1.TabIndex = 0;
-            this.textBoxX1.Text = "1.0";
-
-            // textBoxX2
-            this.textBoxX2.Location = new System.Drawing.Point(118, 12);
-            this.textBoxX2.Name = "textBoxX2";
-            this.textBoxX2.Size = new System.Drawing.Size(100, 20);
-            this.textBoxX2.TabIndex = 1;
-            this.textBoxX2.Text = "1.0";
-
-            // optimizeButton
-            this.optimizeButton.Location = new System.Drawing.Point(12, 38);
-            this.optimizeButton.Name = "optimizeButton";
-            this.optimizeButton.Size = new System.Drawing.Size(206, 23);
-            this.optimizeButton.TabIndex = 2;
-            this.optimizeButton.Text = "Optimize";
-            this.optimizeButton.UseVisualStyleBackColor = true;
-            this.optimizeButton.Click += new System.EventHandler(this.optimizeButton_Click);
-
-            // resultTextBox
-            this.resultTextBox.Location = new System.Drawing.Point(12, 67);
-            this.resultTextBox.Multiline = true;
-            this.resultTextBox.Name = "resultTextBox";
-            this.resultTextBox.ReadOnly = true;
-            this.resultTextBox.Size = new System.Drawing.Size(206, 73);
-            this.resultTextBox.TabIndex = 3;
-
-            // MainForm
-            this.ClientSize = new System.Drawing.Size(230, 150);
-            this.Controls.Add(this.resultTextBox);
-            this.Controls.Add(this.optimizeButton);
-            this.Controls.Add(this.textBoxX2);
-            this.Controls.Add(this.textBoxX1);
-            this.Name = "MainForm";
-            this.Text = "Coordinate Descent App";
-            this.ResumeLayout(false);
-        }
-
-        private void optimizeButton_Click(object sender, EventArgs e)
-        {
-            // Чтение значений переменных из TextBox'ов
-            double x1 = double.Parse(textBoxX1.Text);
-            double x2 = double.Parse(textBoxX2.Text);
-
-            // Пример функции, которую мы хотим оптимизировать
-            Func<double[], double> targetFunction = x => x[0] * x[0] + x[1] * x[1];
-
-            // Начальные значения переменных
-            double[] initialGuess = { x1, x2 };
-
-            // Задаем шаг спуска
-            double stepSize = 0.1;
-
-            // Задаем критерий останова (например, максимальное число итераций)
-            int maxIterations = 100;
-
-            // Запускаем метод покоординатного спуска
-            double[] result = CoordinateDescentOptimization(targetFunction, initialGuess, stepSize, maxIterations);
-
-            // Выводим результат в интерфейс
-            resultTextBox.Text = $"Optimal solution: ({result[0]}, {result[1]})";
-            resultTextBox.AppendText(Environment.NewLine);
-            resultTextBox.AppendText($"Optimal value: {targetFunction(result)}");
-        }
-
-        private double[] CoordinateDescentOptimization(Func<double[], double> targetFunction, double[] initialGuess, double stepSize, int maxIterations)
-        {
-            double[] currentSolution = (double[])initialGuess.Clone();
-            int n = initialGuess.Length;
-
-            for (int iteration = 0; iteration < maxIterations; iteration++)
-            {
-                for (int i = 0; i < n; i++)
-                {
-                    // Вычисляем частную производную по i-й переменной
-                    Func<double, double> partialDerivative = h => (targetFunction(UpdateVariable(currentSolution, i, h + stepSize)) - targetFunction(UpdateVariable(currentSolution, i, h))) / stepSize;
-
-                    // Минимизируем функцию по i-й переменной
-                    currentSolution[i] = Minimize(partialDerivative, currentSolution[i]);
-                }
-            }
-
-            return currentSolution;
-        }
-
-        private double Minimize(Func<double, double> function, double initialGuess)
-        {
-            // Простая реализация метода золотого сечения для минимизации функции
-            double a = initialGuess - 1.0;
-            double b = initialGuess + 1.0;
-            double epsilon = 1e-6;
-
-            while (b - a > epsilon)
-            {
-                double x1 = b - (b - a) / 1.618;
-                double x2 = a + (b - a) / 1.618;
-
-                if (function(x1) < function(x2))
-                    b = x2;
-                else
-                    a = x1;
-            }
-
-            return (a + b) / 2.0;
-        }
-
-        private double[] UpdateVariable(double[] vector, int index, double value)
-        {
-            double[] result = (double[])vector.Clone();
-            result[index] = value;
-            return result;
-        }
-
         [STAThread]
         static void Main()
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            Application.Run(new CoordinateDescent());
+        }
+    }
+
+    public class CoordinateDescent : Form
+    {
+        private TextBox textBoxA;
+        private TextBox textBoxB;
+        private TextBox textBoxE;
+        private Button calculateButton;
+        private Button clearButton;
+        private Label labelA;
+        private Label labelB;
+        private Label labelE;
+        private TextBox localPointsTextBox;
+        private PlotView plotView;
+
+        private TextBox textBoxFunction;
+        private Label labelFunction;
+
+        public CoordinateDescent()
+        {
+            InitializeComponents();
+            this.Size = new System.Drawing.Size(1000, 800);
+        }
+
+        private void InitializeComponents()
+        {
+            Panel mainPanel = new Panel();
+            mainPanel.Dock = DockStyle.Fill;
+            this.Controls.Add(mainPanel);
+
+            labelFunction = new Label();
+            labelFunction.Text = "функция";
+            labelFunction.Location = new System.Drawing.Point(570, 10);
+            labelFunction.AutoSize = true;
+            mainPanel.Controls.Add(labelFunction);
+
+            textBoxFunction = new TextBox();
+            textBoxFunction.Location = new System.Drawing.Point(labelFunction.Right + 5, 10);
+            textBoxFunction.Size = new System.Drawing.Size(200, 20);
+            mainPanel.Controls.Add(textBoxFunction);
+
+            labelA = new Label();
+            labelA.Text = "a";
+            labelA.Location = new System.Drawing.Point(500, 70);
+            labelA.AutoSize = true;
+            mainPanel.Controls.Add(labelA);
+
+            textBoxA = new TextBox();
+            textBoxA.Location = new System.Drawing.Point(labelA.Right + 5, 70);
+            textBoxA.Size = new System.Drawing.Size(100, 20);
+            mainPanel.Controls.Add(textBoxA);
+
+            labelB = new Label();
+            labelB.Text = "b";
+            labelB.Location = new System.Drawing.Point(textBoxA.Right + 10, 70);
+            labelB.AutoSize = true;
+            mainPanel.Controls.Add(labelB);
+
+            textBoxB = new TextBox();
+            textBoxB.Location = new System.Drawing.Point(labelB.Right + 5, 70);
+            textBoxB.Size = new System.Drawing.Size(100, 20);
+            mainPanel.Controls.Add(textBoxB);
+
+            labelE = new Label();
+            labelE.Text = "e(точность)";
+            labelE.Location = new System.Drawing.Point(textBoxB.Right + 10, 70);
+            labelE.AutoSize = true;
+            mainPanel.Controls.Add(labelE);
+
+            textBoxE = new TextBox();
+            textBoxE.Location = new System.Drawing.Point(labelE.Right + 5, 70);
+            textBoxE.Size = new System.Drawing.Size(100, 20);
+            mainPanel.Controls.Add(textBoxE);
+
+            calculateButton = new Button();
+            calculateButton.Text = "рассчитать";
+            calculateButton.Location = new System.Drawing.Point(calculateButton.Left + calculateButton.Width + 10, 10);
+            calculateButton.Click += new System.EventHandler(this.CalculateButton_Click);
+            mainPanel.Controls.Add(calculateButton);
+
+            clearButton = new Button();
+            clearButton.Text = "очистить";
+            clearButton.Location = new System.Drawing.Point(10, 10);
+            clearButton.Click += new System.EventHandler(this.ClearButton_Click);
+            mainPanel.Controls.Add(clearButton);
+
+            localPointsTextBox = new TextBox();
+            localPointsTextBox.Multiline = true;
+            localPointsTextBox.ScrollBars = ScrollBars.Vertical;
+            localPointsTextBox.Location = new System.Drawing.Point(10, 50);
+            localPointsTextBox.Size = new System.Drawing.Size(300, 100);
+            mainPanel.Controls.Add(localPointsTextBox);
+
+            int graphHeight = 550;
+
+            Panel graphContainer = new Panel();
+            graphContainer.Dock = DockStyle.Bottom;
+            graphContainer.Height = graphHeight;
+            mainPanel.Controls.Add(graphContainer);
+
+            plotView = new PlotView();
+            plotView.Dock = DockStyle.Fill;
+            graphContainer.Controls.Add(plotView);
+        }
+
+        private void CalculateButton_Click(object sender, EventArgs e)
+        {
+            if (!double.TryParse(textBoxA.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double a) ||
+                !double.TryParse(textBoxB.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double b) ||
+                !double.TryParse(textBoxE.Text.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double enteredValue))
+            {
+                MessageBox.Show("введите корректные числовые значения");
+                return;
+            }
+
+            if (enteredValue < 0)
+            {
+                throw new ArgumentException("e >= 0");
+            }
+
+            double calculatedEpsilon = enteredValue >= 0 ? Math.Pow(10, -enteredValue) : enteredValue;
+
+            if (a > b)
+            {
+                throw new ArgumentException("a < b");
+            }
+
+            string functionText = textBoxFunction.Text;
+
+            Func<double, double> originalFunction = x =>
+            {
+                var expression = SymbolicExpression.Parse(functionText).Compile("x").Invoke(x);
+                return Convert.ToDouble(expression.ToString());
+            };
+
+            double result = CoordinateDescentUpdate(originalFunction, calculatedEpsilon, a, b);
+
+            double localMin = FindMinimum(a, b, originalFunction, calculatedEpsilon);
+            double localMax = FindMaximum(a, b, originalFunction, calculatedEpsilon);
+
+            localPointsTextBox.Text = $"минимум {localMin}\r\n " +
+                                      $"максимум {localMax}";
+
+            var plotModel = new PlotModel();
+
+            var xAxis = new LinearAxis { Position = AxisPosition.Bottom, Title = "X" };
+            var yAxis = new LinearAxis { Position = AxisPosition.Left, Title = "Y" };
+
+            xAxis.MajorGridlineStyle = LineStyle.Solid;
+            yAxis.MajorGridlineStyle = LineStyle.Solid;
+
+            plotModel.Axes.Add(xAxis);
+            plotModel.Axes.Add(yAxis);
+
+            var seriesPositive = new LineSeries
+            {
+                Color = OxyColors.Green 
+            };
+            var seriesNegative = new LineSeries
+            {
+                Color = OxyColors.Red 
+            };
+
+            for (double x = 0.01; x <= b; x += 0.1)
+            {
+                seriesPositive.Points.Add(new OxyPlot.DataPoint(x, originalFunction(x)));
+            }
+
+            for (double x = -0.01; x >= a; x -= 0.1)
+            {
+                seriesNegative.Points.Add(new OxyPlot.DataPoint(x, originalFunction(x)));
+            }
+
+            plotModel.Series.Add(seriesPositive);
+            plotModel.Series.Add(seriesNegative);
+
+            plotModel.Annotations.Add(new OxyPlot.Annotations.PointAnnotation
+            {
+                X = localMin,
+                Y = originalFunction(localMin),
+                Text = "минимум",
+                TextPosition = new DataPoint(localMin, originalFunction(localMin) - 0.5),
+                TextColor = OxyColors.Red
+            });
+
+            plotModel.Annotations.Add(new OxyPlot.Annotations.PointAnnotation
+            {
+                X = localMax,
+                Y = originalFunction(localMax),
+                Text = "максимум",
+                TextPosition = new DataPoint(localMax, originalFunction(localMax) + 0.5),
+                TextColor = OxyColors.Blue
+            });
+
+            plotView.Model = plotModel;
+        }
+
+        // использовали только значения функции для определения направления движения.
+        private double CoordinateDescentUpdate(Func<double, double> function, double a, double b, double epsilon)
+        {
+            // Начальное значение x в середине интервала [a, b]
+            double x = (a + b) / 2.0;
+
+            // Максимальное число итераций для предотвращения зацикливания
+            int maxIterations = 2000;
+
+            // Цикл итераций метода координатного спуска
+            for (int i = 0; i < maxIterations; i++)
+            {
+                // Значение функции в точке x
+                double fx = function(x);
+
+                // Значение функции в соседних точках
+                double fxPlusEpsilon = function(x + epsilon);
+                double fxMinusEpsilon = function(x - epsilon);
+
+                // Определение направления движения в пространстве поиска
+                double direction = fxPlusEpsilon - fxMinusEpsilon;
+
+                // Обновление границ интервала в зависимости от направления движения
+                if (direction > 0)
+                {
+                    // Если двигаемся вверх, сдвигаем правую границу интервала
+                    b = x;
+                }
+                else if (direction < 0)
+                {
+                    // Если двигаемся вниз, сдвигаем левую границу интервала
+                    a = x;
+                }
+                else
+                {
+                    // Если направление близко к нулю, считаем это минимумом/максимумом и завершаем цикл
+                    break;
+                }
+
+                // Обновление значения x в середине нового интервала
+                x = (a + b) / 2.0;
+
+                // Проверка критерия сходимости: если интервал слишком мал, завершаем цикл
+                if (Math.Abs(b - a) < epsilon)
+                {
+                    break;
+                }
+            }
+
+            // Возвращаем найденное значение x
+            return x;
+        }
+
+        // Метод для поиска минимума функции на заданном интервале
+        private double FindMinimum(double a, double b, Func<double, double> function, double epsilon)
+        {
+            // Вызываем метод координатного спуска для поиска минимума
+            return CoordinateDescentUpdate(function, a, b, epsilon);
+        }
+
+        // Метод для поиска максимума функции на заданном интервале
+        private double FindMaximum(double a, double b, Func<double, double> function, double epsilon)
+        {
+            // Вызываем метод координатного спуска для поиска максимума, инвертируя знак функции
+            return CoordinateDescentUpdate(x => -function(x), a, b, epsilon);
+        }
+
+        private void ClearButton_Click(object sender, EventArgs e)
+        {
+            textBoxA.Clear();
+            textBoxB.Clear();
+            textBoxE.Clear();
+            textBoxFunction.Clear();
+            localPointsTextBox.Text = string.Empty;
         }
     }
 }
